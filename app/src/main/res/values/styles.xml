@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Custom chip style with more visible selected state -->
+    <style name="Widget.ImageDiffer.Chip.Filter" parent="Widget.Material3.Chip.Filter">
+        <item name="android:textColor">@color/chip_text_color</item>
+        <item name="chipBackgroundColor">@color/chip_background_color</item>
+        <item name="chipStrokeColor">@color/chip_stroke_color</item>
+        <item name="chipStrokeWidth">1.5dp</item>
+        <item name="checkedIconVisible">true</item>
+        <item name="checkedIconTint">?attr/colorOnPrimary</item>
+    </style>
+
+    <!-- Custom toggle button style with more visible selected state -->
+    <style name="Widget.ImageDiffer.Button.Toggle" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">@color/toggle_button_text_color</item>
+        <item name="backgroundTint">@color/toggle_button_background_color</item>
+        <item name="strokeColor">@color/toggle_button_stroke_color</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="iconTint">@color/toggle_button_text_color</item>
+    </style>
+</resources>

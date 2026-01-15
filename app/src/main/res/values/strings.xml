@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Image Differ</string>
+
+    <!-- Main Activity -->
+    <string name="select_first_image">Select First Image</string>
+    <string name="select_second_image">Select Second Image</string>
+    <string name="compare_images">Compare Images</string>
+    <string name="tap_to_select">Tap to select an image</string>
+    <string name="first_image">First Image</string>
+    <string name="second_image">Second Image</string>
+    <string name="clear_selection">Clear</string>
+
+    <!-- Compare Activity -->
+    <string name="compare_title">Compare</string>
+    <string name="alignment_options">Alignment Options</string>
+    <string name="auto_alignment">Auto Alignment</string>
+    <string name="manual_keypoints">Manual Keypoints</string>
+    <string name="select_roi">Select ROI</string>
+    <string name="clear_roi">Clear ROI</string>
+    <string name="detect_keypoints">Detect Kpts</string>
+    <string name="align_images">Align Images</string>
+    <string name="show_diff">Show Diff</string>
+
+    <!-- Visualization modes -->
+    <string name="view_mode">View Mode</string>
+    <string name="mode_overlay">Overlay</string>
+    <string name="mode_side_by_side">Side by Side</string>
+    <string name="mode_slider">Slider</string>
+    <string name="overlay_opacity">Opacity</string>
+
+    <!-- Keypoint selection -->
+    <string name="keypoints_detected">%d keypoints detected</string>
+    <string name="keypoints_selected">%d keypoints selected</string>
+    <string name="tap_to_select_keypoints">Tap keypoints to select them</string>
+    <string name="draw_keypoints_hint">Tap to place keypoints on both images</string>
+    <string name="min_keypoints_required">At least 4 keypoint pairs required for alignment</string>
+
+    <!-- ROI -->
+    <string name="roi_hint">Drag corners to adjust the region of interest</string>
+    <string name="roi_selected">ROI selected: %1$d x %2$d</string>
+    <string name="roi_synced">ROI synced between images</string>
+
+    <!-- Processing -->
+    <string name="processing">Processing…</string>
+    <string name="aligning_images">Aligning images…</string>
+    <string name="detecting_features">Detecting features…</string>
+    <string name="calculating_diff">Calculating difference…</string>
+
+    <!-- Errors -->
+    <string name="error_loading_image">Failed to load image</string>
+    <string name="error_alignment_failed">Image alignment failed</string>
+    <string name="error_insufficient_keypoints">Not enough keypoints found for alignment</string>
+    <string name="error_no_images">Please select both images first</string>
+
+    <!-- Actions -->
+    <string name="reset">Reset</string>
+    <string name="save">Save</string>
+    <string name="share">Share</string>
+    <string name="settings">Settings</string>
+    <string name="select_images_hint">Select two images to compare their differences</string>
+</resources>
