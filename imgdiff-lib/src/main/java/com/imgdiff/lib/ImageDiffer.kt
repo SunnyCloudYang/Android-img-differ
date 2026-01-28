@@ -45,20 +45,29 @@ class ImageDiffer {
      * 
      * @param bitmap Input image
      * @param roi Optional region of interest to limit detection
+     * @param minResponse Minimum response value to filter keypoints (higher = fewer, stronger keypoints)
+     * @param maxKeypoints Maximum number of keypoints to return (0 = no limit)
      * @return KeypointResult containing detected keypoints
      */
     suspend fun detectKeypoints(
         bitmap: Bitmap,
-        roi: ROI? = null
+        roi: ROI? = null,
+        minResponse: Float = 0.01f,
+        maxKeypoints: Int = 100
     ): KeypointResult = withContext(Dispatchers.Default) {
-        siftAligner.detectKeypoints(bitmap, roi)
+        siftAligner.detectKeypoints(bitmap, roi, minResponse, maxKeypoints)
     }
     
     /**
      * Detect keypoints synchronously (for use from Java or non-coroutine contexts).
      */
-    fun detectKeypointsSync(bitmap: Bitmap, roi: ROI? = null): KeypointResult {
-        return siftAligner.detectKeypoints(bitmap, roi)
+    fun detectKeypointsSync(
+        bitmap: Bitmap, 
+        roi: ROI? = null,
+        minResponse: Float = 0.01f,
+        maxKeypoints: Int = 100
+    ): KeypointResult {
+        return siftAligner.detectKeypoints(bitmap, roi, minResponse, maxKeypoints)
     }
     
     /**

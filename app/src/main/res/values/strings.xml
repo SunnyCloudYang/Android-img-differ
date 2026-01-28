@@ -19,6 +19,7 @@
     <string name="select_roi">Select ROI</string>
     <string name="clear_roi">Clear ROI</string>
     <string name="detect_keypoints">Detect Kpts</string>
+    <string name="clear_keypoints">Clear Kpts</string>
     <string name="align_images">Align Images</string>
     <string name="show_diff">Show Diff</string>
 
@@ -27,6 +28,8 @@
     <string name="mode_overlay">Overlay</string>
     <string name="mode_side_by_side">Side by Side</string>
     <string name="mode_slider">Slider</string>
+    <string name="mode_highlight">Highlight</string>
+    <string name="mode_minus">Minus</string>
     <string name="overlay_opacity">Opacity</string>
 
     <!-- Keypoint selection -->

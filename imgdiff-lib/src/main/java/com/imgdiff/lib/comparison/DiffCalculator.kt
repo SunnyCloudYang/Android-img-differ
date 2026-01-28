@@ -57,6 +57,8 @@ class DiffCalculator {
             DiffMode.STRUCTURAL -> calculateStructuralDiff(src, tgt, threshold)
             DiffMode.ABSOLUTE -> calculateAbsoluteDiff(src, tgt)
             DiffMode.OVERLAY -> calculateOverlayDiff(src, tgt, threshold)
+            DiffMode.HIGHLIGHT -> calculateHighlightDiff(src, tgt, threshold)
+            DiffMode.MINUS -> calculateMinusDiff(src, tgt)
         }
     }
     
@@ -397,6 +399,228 @@ class DiffCalculator {
             totalPixelCount = totalPixels,
             diffRegions = emptyList(),
             mode = DiffMode.OVERLAY,
+            meanDifference = meanDiff
+        )
+    }
+    
+    /**
+     * Highlight different pixels with two colors:
+     * - Grey for same/similar pixels
+     * - Green for pixels where image 1 (source) is brighter/different
+     * - Red for pixels where image 2 (target) is brighter/different
+     */
+    private fun calculateHighlightDiff(
+        source: Bitmap,
+        target: Bitmap,
+        threshold: Int
+    ): DiffResult {
+        val srcMat = BitmapUtils.bitmapToMat(source)
+        val tgtMat = BitmapUtils.bitmapToMat(target)
+        
+        // Convert to grayscale for difference calculation
+        val srcGray = Mat()
+        val tgtGray = Mat()
+        Imgproc.cvtColor(srcMat, srcGray, Imgproc.COLOR_RGBA2GRAY)
+        Imgproc.cvtColor(tgtMat, tgtGray, Imgproc.COLOR_RGBA2GRAY)
+        
+        // Calculate absolute difference for threshold mask
+        val diffMat = Mat()
+        Core.absdiff(srcGray, tgtGray, diffMat)
+        
+        // Create threshold mask
+        val threshMat = Mat()
+        Imgproc.threshold(diffMat, threshMat, threshold.toDouble(), 255.0, Imgproc.THRESH_BINARY)
+        
+        // Colors (RGBA format)
+        // Green for image 1 (source brighter)
+        val greenR = 0.0
+        val greenG = 200.0
+        val greenB = 0.0
+        // Red for image 2 (target brighter)
+        val redR = 220.0
+        val redG = 0.0
+        val redB = 0.0
+        
+        // Create result: grey for same pixels, green/red for different pixels
+        val result = Mat(srcMat.size(), srcMat.type())
+        for (row in 0 until result.rows()) {
+            for (col in 0 until result.cols()) {
+                val maskVal = threshMat.get(row, col)
+                val srcVal = srcGray.get(row, col)
+                val tgtVal = tgtGray.get(row, col)
+                val srcGrayValue = srcVal?.get(0) ?: 128.0
+                val tgtGrayValue = tgtVal?.get(0) ?: 128.0
+                
+                if (maskVal != null && maskVal[0] > 0) {
+                    // Different pixel: green if source brighter, red if target brighter
+                    if (srcGrayValue > tgtGrayValue) {
+                        // Source (image 1) is brighter - show green
+                        result.put(row, col, greenR, greenG, greenB, 255.0)
+                    } else {
+                        // Target (image 2) is brighter - show red
+                        result.put(row, col, redR, redG, redB, 255.0)
+                    }
+                } else {
+                    // Same pixel: show in grey (based on source luminance)
+                    result.put(row, col, srcGrayValue, srcGrayValue, srcGrayValue, 255.0)
+                }
+            }
+        }
+        
+        val diffPixels = Core.countNonZero(threshMat)
+        val totalPixels = threshMat.rows() * threshMat.cols()
+        val diffPercentage = (diffPixels.toFloat() / totalPixels) * 100f
+        val meanDiff = Core.mean(diffMat).`val`[0].toFloat()
+        
+        val diffVisBitmap = BitmapUtils.matToBitmap(result)
+        val diffMaskBitmap = BitmapUtils.matToBitmap(threshMat)
+        
+        // Cleanup
+        srcMat.release()
+        tgtMat.release()
+        srcGray.release()
+        tgtGray.release()
+        diffMat.release()
+        threshMat.release()
+        result.release()
+        
+        return DiffResult(
+            sourceImage = source,
+            targetImage = target,
+            diffVisualization = diffVisBitmap,
+            diffMask = diffMaskBitmap,
+            diffPercentage = diffPercentage,
+            diffPixelCount = diffPixels,
+            totalPixelCount = totalPixels,
+            diffRegions = emptyList(),
+            mode = DiffMode.HIGHLIGHT,
+            meanDifference = meanDiff
+        )
+    }
+    
+    /**
+     * Subtract two images (source - target) and visualize the signed difference.
+     * Positive differences (source > target) shown in warm colors (red/yellow)
+     * Negative differences (source < target) shown in cool colors (blue/cyan)
+     * No difference shown in neutral gray
+     */
+    private fun calculateMinusDiff(
+        source: Bitmap,
+        target: Bitmap
+    ): DiffResult {
+        val srcMat = BitmapUtils.bitmapToMat(source)
+        val tgtMat = BitmapUtils.bitmapToMat(target)
+        
+        // Convert to float for signed subtraction
+        val srcFloat = Mat()
+        val tgtFloat = Mat()
+        srcMat.convertTo(srcFloat, CvType.CV_32FC4)
+        tgtMat.convertTo(tgtFloat, CvType.CV_32FC4)
+        
+        // Calculate signed difference: source - target
+        val diffFloat = Mat()
+        Core.subtract(srcFloat, tgtFloat, diffFloat)
+        
+        // Convert to grayscale for analysis
+        val srcGray = Mat()
+        val tgtGray = Mat()
+        Imgproc.cvtColor(srcMat, srcGray, Imgproc.COLOR_RGBA2GRAY)
+        Imgproc.cvtColor(tgtMat, tgtGray, Imgproc.COLOR_RGBA2GRAY)
+        
+        // Signed difference in grayscale
+        val srcGrayFloat = Mat()
+        val tgtGrayFloat = Mat()
+        srcGray.convertTo(srcGrayFloat, CvType.CV_32F)
+        tgtGray.convertTo(tgtGrayFloat, CvType.CV_32F)
+        
+        val diffGrayFloat = Mat()
+        Core.subtract(srcGrayFloat, tgtGrayFloat, diffGrayFloat)
+        
+        // Create visualization: 
+        // - Gray (128) = no difference
+        // - Brighter = source brighter than target
+        // - Darker = source darker than target
+        // With color coding: red for positive, blue for negative
+        val result = Mat(srcMat.size(), CvType.CV_8UC4)
+        
+        for (row in 0 until result.rows()) {
+            for (col in 0 until result.cols()) {
+                val diffVal = diffGrayFloat.get(row, col)
+                if (diffVal != null) {
+                    val diff = diffVal[0].toFloat()
+                    
+                    // Map difference to color
+                    // Positive (source > target): red/orange
+                    // Negative (source < target): blue/cyan
+                    // Zero: gray
+                    val r: Double
+                    val g: Double
+                    val b: Double
+                    
+                    if (kotlin.math.abs(diff) < 10) {
+                        // Near zero difference - neutral gray
+                        r = 128.0
+                        g = 128.0
+                        b = 128.0
+                    } else if (diff > 0) {
+                        // Positive difference - warm colors (source is brighter)
+                        val intensity = minOf(diff / 255f, 1f)
+                        r = 128.0 + 127.0 * intensity
+                        g = 128.0 - 64.0 * intensity
+                        b = 128.0 - 128.0 * intensity
+                    } else {
+                        // Negative difference - cool colors (target is brighter)
+                        val intensity = minOf(-diff / 255f, 1f)
+                        r = 128.0 - 128.0 * intensity
+                        g = 128.0 + 64.0 * intensity
+                        b = 128.0 + 127.0 * intensity
+                    }
+                    
+                    result.put(row, col, r, g, b, 255.0)
+                }
+            }
+        }
+        
+        // Calculate statistics using absolute difference
+        val absDiffMat = Mat()
+        Core.absdiff(srcGray, tgtGray, absDiffMat)
+        
+        val threshMat = Mat()
+        Imgproc.threshold(absDiffMat, threshMat, 10.0, 255.0, Imgproc.THRESH_BINARY)
+        
+        val diffPixels = Core.countNonZero(threshMat)
+        val totalPixels = threshMat.rows() * threshMat.cols()
+        val diffPercentage = (diffPixels.toFloat() / totalPixels) * 100f
+        val meanDiff = Core.mean(absDiffMat).`val`[0].toFloat()
+        
+        val diffVisBitmap = BitmapUtils.matToBitmap(result)
+        val diffMaskBitmap = BitmapUtils.matToBitmap(threshMat)
+        
+        // Cleanup
+        srcMat.release()
+        tgtMat.release()
+        srcFloat.release()
+        tgtFloat.release()
+        diffFloat.release()
+        srcGray.release()
+        tgtGray.release()
+        srcGrayFloat.release()
+        tgtGrayFloat.release()
+        diffGrayFloat.release()
+        result.release()
+        absDiffMat.release()
+        threshMat.release()
+        
+        return DiffResult(
+            sourceImage = source,
+            targetImage = target,
+            diffVisualization = diffVisBitmap,
+            diffMask = diffMaskBitmap,
+            diffPercentage = diffPercentage,
+            diffPixelCount = diffPixels,
+            totalPixelCount = totalPixels,
+            diffRegions = emptyList(),
+            mode = DiffMode.MINUS,
             meanDifference = meanDiff
         )
     }

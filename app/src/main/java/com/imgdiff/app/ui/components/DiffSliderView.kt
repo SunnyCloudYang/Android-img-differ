@@ -61,7 +61,7 @@ class DiffSliderView @JvmOverloads constructor(
     
     private val labelPaint = Paint().apply {
         color = 0xFFFFFFFF.toInt()
-        textSize = resources.getDimension(R.dimen.spacing_md)
+        textSize = resources.getDimension(R.dimen.spacing_lg)
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
         setShadowLayer(2f, 1f, 1f, 0xFF000000.toInt())

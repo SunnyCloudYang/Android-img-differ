@@ -32,12 +32,15 @@ class SIFTAligner {
     companion object {
         private const val TAG = "SIFTAligner"
         
-        // SIFT parameters
-        private const val SIFT_N_FEATURES = 0  // 0 = detect all features
+        // SIFT parameters - increased contrast threshold for fewer, more important keypoints
+        private const val SIFT_N_FEATURES = 500  // Limit max features
         private const val SIFT_N_OCTAVE_LAYERS = 3
-        private const val SIFT_CONTRAST_THRESHOLD = 0.04
+        private const val SIFT_CONTRAST_THRESHOLD = 0.08  // Higher = fewer keypoints (default 0.04)
         private const val SIFT_EDGE_THRESHOLD = 10.0
         private const val SIFT_SIGMA = 1.6
+        
+        // Default response threshold for filtering keypoints (higher = fewer, stronger keypoints)
+        const val DEFAULT_RESPONSE_THRESHOLD = 0.01f
         
         // Matching parameters
         private const val LOWE_RATIO_THRESHOLD = 0.75f
@@ -55,6 +58,9 @@ class SIFTAligner {
         )
     }
     
+    // Configurable response threshold
+    var responseThreshold: Float = DEFAULT_RESPONSE_THRESHOLD
+    
     private val matcher: BFMatcher by lazy {
         BFMatcher.create(Core.NORM_L2, false)
     }
@@ -64,9 +70,16 @@ class SIFTAligner {
      * 
      * @param bitmap The input image
      * @param roi Optional region of interest to limit detection
+     * @param minResponse Minimum response value to filter keypoints (higher = fewer, stronger keypoints)
+     * @param maxKeypoints Maximum number of keypoints to return (0 = no limit)
      * @return KeypointResult containing detected keypoints and descriptors
      */
-    fun detectKeypoints(bitmap: Bitmap, roi: ROI? = null): KeypointResult {
+    fun detectKeypoints(
+        bitmap: Bitmap, 
+        roi: ROI? = null,
+        minResponse: Float = responseThreshold,
+        maxKeypoints: Int = 100
+    ): KeypointResult {
         val mat = BitmapUtils.bitmapToMat(bitmap)
         val grayMat = Mat()
         
@@ -109,20 +122,31 @@ class SIFTAligner {
             sift.detectAndCompute(workingMat, Mat(), keypoints, descriptors)
         }
         
-        // Convert to our Keypoint model
-        val keypointList = keypoints.toList().mapIndexed { index, kp ->
-            Keypoint(
-                id = index,
-                x = kp.pt.x.toFloat(),
-                y = kp.pt.y.toFloat(),
-                size = kp.size.toFloat(),
-                angle = kp.angle.toFloat(),
-                response = kp.response.toFloat(),
-                octave = kp.octave
-            )
+        // Convert to our Keypoint model and filter by response
+        var keypointList = keypoints.toList()
+            .mapIndexed { index, kp ->
+                Keypoint(
+                    id = index,
+                    x = kp.pt.x.toFloat(),
+                    y = kp.pt.y.toFloat(),
+                    size = kp.size.toFloat(),
+                    angle = kp.angle.toFloat(),
+                    response = kp.response.toFloat(),
+                    octave = kp.octave
+                )
+            }
+            .filter { it.response >= minResponse }  // Filter by response threshold
+            .sortedByDescending { it.response }      // Sort by strongest first
+        
+        // Limit to maxKeypoints if specified
+        if (maxKeypoints > 0 && keypointList.size > maxKeypoints) {
+            keypointList = keypointList.take(maxKeypoints)
         }
         
-        Log.d(TAG, "Detected ${keypointList.size} keypoints")
+        // Re-assign IDs after filtering
+        keypointList = keypointList.mapIndexed { index, kp -> kp.copy(id = index) }
+        
+        Log.d(TAG, "Detected ${keypoints.toList().size} keypoints, filtered to ${keypointList.size}")
         
         // Cleanup
         mat.release()

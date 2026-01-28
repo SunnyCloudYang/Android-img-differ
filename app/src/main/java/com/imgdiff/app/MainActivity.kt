@@ -155,6 +155,7 @@ class MainActivity : AppCompatActivity() {
                 launch {
                     viewModel.canCompare.collectLatest { canCompare ->
                         binding.btnCompare.isEnabled = canCompare
+                        binding.textHint.visibility = if (canCompare) View.GONE else View.VISIBLE
                     }
                 }
             }

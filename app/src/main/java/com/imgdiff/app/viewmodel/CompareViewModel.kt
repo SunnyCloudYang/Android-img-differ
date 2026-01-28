@@ -97,7 +97,9 @@ class CompareViewModel(application: Application) : AndroidViewModel(application)
     enum class ViewMode {
         OVERLAY,
         SIDE_BY_SIDE,
-        SLIDER
+        SLIDER,
+        HIGHLIGHT,
+        MINUS
     }
     
     /**
@@ -245,6 +247,23 @@ class CompareViewModel(application: Application) : AndroidViewModel(application)
     fun clearManualKeypoints() {
         _manualSourceKeypoints.value = emptyList()
         _manualTargetKeypoints.value = emptyList()
+    }
+    
+    /**
+     * Clear all detected keypoints.
+     */
+    fun clearDetectedKeypoints() {
+        _sourceKeypoints.value = emptyList()
+        _targetKeypoints.value = emptyList()
+        _selectedSourceKeypoints.value = emptyList()
+        _selectedTargetKeypoints.value = emptyList()
+    }
+    
+    /**
+     * Check if keypoints have been detected.
+     */
+    fun hasDetectedKeypoints(): Boolean {
+        return _sourceKeypoints.value.isNotEmpty() || _targetKeypoints.value.isNotEmpty()
     }
     
     /**

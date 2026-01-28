@@ -4,6 +4,7 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -14,6 +15,7 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.snackbar.Snackbar
 import com.imgdiff.app.databinding.ActivityCompareBinding
 import com.imgdiff.app.ui.components.KeypointOverlayView
@@ -36,6 +38,7 @@ class CompareActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCompareBinding
     private val viewModel: CompareViewModel by viewModels()
+    private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
     
     // Current editing target for keypoints (source or target)
     private var isEditingSourceKeypoints = true
@@ -67,8 +70,8 @@ class CompareActivity : AppCompatActivity() {
             insets
         }
         
-        // Apply bottom inset to control panel
-        ViewCompat.setOnApplyWindowInsetsListener(binding.controlPanel) { view, insets ->
+        // Apply bottom inset to bottom sheet
+        ViewCompat.setOnApplyWindowInsetsListener(binding.bottomSheet) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.updatePadding(bottom = view.paddingBottom + systemBars.bottom)
             insets
@@ -79,9 +82,80 @@ class CompareActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener {
             finish()
         }
+        
+        // Inflate menu
+        binding.toolbar.inflateMenu(R.menu.menu_compare)
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_roi -> {
+                    toggleROIMode()
+                    true
+                }
+                R.id.action_keypoints -> {
+                    toggleKeypointsMode()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+    
+    private fun toggleROIMode() {
+        viewModel.toggleROIMode()
+    }
+    
+    private fun toggleKeypointsMode() {
+        val isAuto = viewModel.alignmentMode.value == CompareViewModel.AlignmentMode.AUTO
+        val hasKeypoints = viewModel.hasDetectedKeypoints()
+
+        if (isAuto && hasKeypoints) {
+            viewModel.clearDetectedKeypoints()
+            binding.keypointOverlay.visibility = View.GONE
+            updateMenuItems()
+        } else {
+            if (!isAuto) {
+                binding.toggleAlignmentMode.check(R.id.btnAutoAlign)
+            }
+            viewModel.detectKeypoints()
+        }
+    }
+    
+    private fun updateMenuItems() {
+        val menu = binding.toolbar.menu
+        
+        // Update ROI menu item
+        val roiItem = menu.findItem(R.id.action_roi)
+        roiItem?.let {
+            if (viewModel.isROIMode.value) {
+                it.setIcon(R.drawable.ic_clear)
+                it.title = getString(R.string.clear_roi)
+            } else {
+                it.setIcon(R.drawable.ic_roi)
+                it.title = getString(R.string.select_roi)
+            }
+        }
+        
+        // Update keypoints menu item
+        val kpItem = menu.findItem(R.id.action_keypoints)
+        kpItem?.let {
+            val isAuto = viewModel.alignmentMode.value == CompareViewModel.AlignmentMode.AUTO
+            val hasKeypoints = viewModel.hasDetectedKeypoints()
+
+            if (isAuto && hasKeypoints) {
+                it.setIcon(R.drawable.ic_keypoint_clear)
+                it.title = getString(R.string.clear_keypoints)
+            } else {
+                it.setIcon(R.drawable.ic_keypoint)
+                it.title = getString(R.string.detect_keypoints)
+            }
+        }
     }
     
     private fun setupViews() {
+        // Setup Bottom Sheet
+        bottomSheetBehavior = BottomSheetBehavior.from(binding.bottomSheet)
+        bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+
         // Setup zoomable image view transform listener
         binding.zoomableImageView.onTransformChangedListener = { scale, translateX, translateY ->
             // Sync transform to other views
@@ -138,6 +212,34 @@ class CompareActivity : AppCompatActivity() {
         }
     }
     
+    /**
+     * Sync ROI overlay with the current view mode's image bounds.
+     */
+    private fun syncROIWithCurrentView() {
+        when (viewModel.viewMode.value) {
+            CompareViewModel.ViewMode.OVERLAY,
+            CompareViewModel.ViewMode.HIGHLIGHT,
+            CompareViewModel.ViewMode.MINUS -> {
+                binding.zoomableImageView.post {
+                    val bounds = binding.zoomableImageView.getImageBounds()
+                    binding.roiSelector.setImageBounds(bounds)
+                }
+            }
+            CompareViewModel.ViewMode.SIDE_BY_SIDE -> {
+                binding.sideBySideView.post {
+                    val bounds = binding.sideBySideView.getLeftImageBounds()
+                    binding.roiSelector.setImageBounds(bounds)
+                }
+            }
+            CompareViewModel.ViewMode.SLIDER -> {
+                binding.diffSlider.post {
+                    val bounds = binding.diffSlider.getImageBounds()
+                    binding.roiSelector.setImageBounds(bounds)
+                }
+            }
+        }
+    }
+    
     private fun setupClickListeners() {
         // Alignment mode toggle
         binding.toggleAlignmentMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -154,16 +256,6 @@ class CompareActivity : AppCompatActivity() {
                     }
                 }
             }
-        }
-        
-        // ROI button
-        binding.btnSelectROI.setOnClickListener {
-            viewModel.toggleROIMode()
-        }
-        
-        // Detect keypoints button
-        binding.btnDetectKeypoints.setOnClickListener {
-            viewModel.detectKeypoints()
         }
         
         // Align button
@@ -189,6 +281,8 @@ class CompareActivity : AppCompatActivity() {
                 R.id.chipOverlay -> viewModel.setViewMode(CompareViewModel.ViewMode.OVERLAY)
                 R.id.chipSideBySide -> viewModel.setViewMode(CompareViewModel.ViewMode.SIDE_BY_SIDE)
                 R.id.chipSlider -> viewModel.setViewMode(CompareViewModel.ViewMode.SLIDER)
+                R.id.chipHighlight -> viewModel.setViewMode(CompareViewModel.ViewMode.HIGHLIGHT)
+                R.id.chipMinus -> viewModel.setViewMode(CompareViewModel.ViewMode.MINUS)
             }
         }
         
@@ -301,10 +395,11 @@ class CompareActivity : AppCompatActivity() {
                 launch {
                     viewModel.isROIMode.collectLatest { isActive ->
                         binding.roiSelector.visibility = if (isActive) View.VISIBLE else View.GONE
-                        binding.btnSelectROI.text = if (isActive) {
-                            getString(R.string.clear_roi)
-                        } else {
-                            getString(R.string.select_roi)
+                        updateMenuItems()
+                        
+                        // Sync ROI overlay with current view mode
+                        if (isActive) {
+                            syncROIWithCurrentView()
                         }
                     }
                 }
@@ -326,7 +421,14 @@ class CompareActivity : AppCompatActivity() {
                             binding.keypointOverlay.visibility = 
                                 if (keypoints.isNotEmpty()) View.VISIBLE else View.GONE
                         }
+                        // Update menu items based on whether keypoints are detected
+                        updateMenuItems()
                         updateStatusText()
+                        
+                        // Update overlay bounds after keypoints change
+                        binding.zoomableImageView.post {
+                            updateOverlayBounds()
+                        }
                     }
                 }
                 
@@ -364,6 +466,14 @@ class CompareActivity : AppCompatActivity() {
                             binding.statusText.text = "Aligned with $inliers/$count matches"
                             binding.statusText.visibility = View.VISIBLE
                         }
+                    }
+                }
+
+                // Alignment mode
+                launch {
+                    viewModel.alignmentMode.collectLatest { mode ->
+                        updateMenuItems()
+                        updateStatusText()
                     }
                 }
             }
@@ -428,11 +538,57 @@ class CompareActivity : AppCompatActivity() {
                 binding.diffSlider.beforeLabel = "Source"
                 binding.diffSlider.afterLabel = "Target"
             }
+            
+            CompareViewModel.ViewMode.HIGHLIGHT -> {
+                binding.zoomableImageView.visibility = View.VISIBLE
+                // Auto-calculate highlight diff when switching to this mode
+                if (source != null && aligned != null) {
+                    viewModel.calculateDiff(DiffMode.HIGHLIGHT)
+                }
+            }
+            
+            CompareViewModel.ViewMode.MINUS -> {
+                binding.zoomableImageView.visibility = View.VISIBLE
+                // Auto-calculate minus diff when switching to this mode
+                if (source != null && aligned != null) {
+                    viewModel.calculateDiff(DiffMode.MINUS)
+                }
+            }
         }
         
-        // Update overlay bounds after mode change
-        binding.zoomableImageView.post {
-            updateOverlayBounds()
+        // Update overlay bounds after mode change based on the active view
+        when (mode) {
+            CompareViewModel.ViewMode.OVERLAY, 
+            CompareViewModel.ViewMode.HIGHLIGHT, 
+            CompareViewModel.ViewMode.MINUS -> {
+                binding.zoomableImageView.post {
+                    val bounds = binding.zoomableImageView.getImageBounds()
+                    val (imgWidth, imgHeight) = binding.zoomableImageView.getImageSize()
+                    if (imgWidth > 0 && imgHeight > 0) {
+                        syncOverlayBounds(bounds, imgWidth, imgHeight)
+                    }
+                }
+            }
+            CompareViewModel.ViewMode.SIDE_BY_SIDE -> {
+                binding.sideBySideView.post {
+                    val bounds = binding.sideBySideView.getLeftImageBounds()
+                    val source = viewModel.sourceImage.value
+                    if (source != null && bounds.width() > 0) {
+                        binding.keypointOverlay.setImageBounds(bounds, source.width, source.height)
+                        binding.roiSelector.setImageBounds(bounds)
+                    }
+                }
+            }
+            CompareViewModel.ViewMode.SLIDER -> {
+                binding.diffSlider.post {
+                    val bounds = binding.diffSlider.getImageBounds()
+                    val source = viewModel.sourceImage.value
+                    if (source != null && bounds.width() > 0) {
+                        binding.keypointOverlay.setImageBounds(bounds, source.width, source.height)
+                        binding.roiSelector.setImageBounds(bounds)
+                    }
+                }
+            }
         }
     }
     
@@ -459,10 +615,25 @@ class CompareActivity : AppCompatActivity() {
             CompareViewModel.ViewMode.SIDE_BY_SIDE -> {
                 binding.sideBySideView.setImages(diffResult.sourceImage, diffResult.diffVisualization)
             }
+            
+            CompareViewModel.ViewMode.HIGHLIGHT -> {
+                binding.zoomableImageView.setBaseImage(diffResult.diffVisualization)
+                binding.zoomableImageView.setOverlayImage(null)
+            }
+            
+            CompareViewModel.ViewMode.MINUS -> {
+                binding.zoomableImageView.setBaseImage(diffResult.diffVisualization)
+                binding.zoomableImageView.setOverlayImage(null)
+            }
         }
         
         // Show stats
-        val statsText = "Diff: ${String.format("%.1f", diffResult.diffPercentage)}% | " +
+        val modeLabel = when (diffResult.mode) {
+            DiffMode.HIGHLIGHT -> "Highlight"
+            DiffMode.MINUS -> "Minus"
+            else -> "Diff"
+        }
+        val statsText = "$modeLabel: ${String.format("%.1f", diffResult.diffPercentage)}% | " +
                        "${diffResult.diffPixelCount} pixels"
         binding.statusText.text = statsText
         binding.statusText.visibility = View.VISIBLE

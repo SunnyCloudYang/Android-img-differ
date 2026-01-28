@@ -17,7 +17,13 @@ enum class DiffMode {
     ABSOLUTE,
     
     /** Blend overlay showing differences */
-    OVERLAY
+    OVERLAY,
+    
+    /** Highlight different pixels with distinct colors based on difference magnitude */
+    HIGHLIGHT,
+    
+    /** Subtract images (source - target), showing signed difference */
+    MINUS
 }
 
 /**
